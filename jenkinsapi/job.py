@@ -282,6 +282,13 @@ class Job(JenkinsBase, MutableJenkinsThing):
         # understand the test above.
         return dict((build["number"], build["url"]) for build in builds)
 
+    def get_latest_build_numbers(self):
+        """
+        New implementation since SEC-1375
+        """
+        builds = self._data["builds"]
+        return [build["number"] for build in builds]
+
     def get_revision_dict(self):
         """
         Get dictionary of all revisions with a list of buildnumbers (int) that used that particular revision
