@@ -142,35 +142,12 @@ class Build(JenkinsBase):
         upstream_build = None
         causes = None
         upstream = None
-        causes = actions = self.get_actions()['causes']
+        causes = self.get_actions()['causes']
         for cause in causes:
             if 'upstreamBuild' in cause:
                 upstream_build = cause['upstreamBuild']
                 return upstream_build   
         return upstream_build
-
-        """
-        for action in actions:
-            if 'causes' in action:
-                causes = action['causes']
-                for cause in causes:
-                    if 'upstreamBuild' in cause:
-                        upstream_build = cause['upstreamBuild']
-                        return upstream_build   
-        return upstream_build  """
-
-
-    """ KOKO CHANGES
-    def get_upstream_build_number(self):
-        
-        Get the upstream build number if it exist, None otherwise
-        :return: int or None
-        
-        try:
-            return int(self.get_actions()['causes'][0]['upstreamBuild'])
-        except KeyError:
-            return None
-    """
 
     def get_upstream_build(self):
         """
