@@ -218,6 +218,88 @@ class Job(JenkinsBase, MutableJenkinsThing):
                         delay=invoke_pre_check_delay)
         return invocation
 
+
+    def trigger_build(self,
+               block=False,
+               skip_if_running=False,
+               invoke_pre_check_delay=3,
+               invoke_block_delay=3,
+               build_params=None,
+    ):
+        """
+        SEC-1545: this is a new implementation for triggering a job. The
+        'invoke' method returns the wrong build number in scenarios where
+        multiple builds of the same job are triggered at the same time. The new
+        implementation parses the response html sent by the request.
+        NOTE: the implementation is tied to the Jenkins UI. This is not ideal,
+        but better than the buggy alternative.
+
+        """
+        assert isinstance(invoke_pre_check_delay, (int, float))
+        assert isinstance(invoke_block_delay, (int, float))
+        assert isinstance(block, bool)
+        assert isinstance(skip_if_running, bool)
+
+        # Either copy the params dict or make a new one.
+        build_params = build_params and dict(
+            build_params.items()) or {}  # Via POSTed JSON
+        params = {}  # Via Get string
+
+        if len(self.get_params_list()) == 0:
+            if self.is_queued():
+                raise WillNotBuild('%s is already queued' % repr(self))
+
+            elif self.is_running():
+                if skip_if_running:
+                    log.warn(
+                        "Will not request new build because %s is already running",self.name)
+                else:
+                    log.warn(
+                        "Will re-schedule %s even though it is already running", self.name)
+        elif self.has_queued_build(build_params):
+            msg = 'A build with these parameters is already queued.'
+            raise WillNotBuild(msg)
+
+        log.info("Attempting to start %s on %s", self.name, repr(
+            self.get_jenkins_obj()))
+
+        url = self.get_build_triggerurl()
+        data = build_params
+        headers = {'Accept': 'application/json'}  #Ask for json response
+        response = self.jenkins.requester.post_and_confirm_status(
+            url,
+            data=data,
+            params=params,
+            valid=[200, 201],
+            headers=headers
+        )
+
+        json_response = response.text
+        json_data = json.loads(json_response)
+        build_id = json_data['nextBuildNumber']
+        print 'BUILD ID: ' + str(build_id)
+
+        if invoke_pre_check_delay > 0:
+            log.info(
+                "Waiting for %is to allow Jenkins to catch up",
+                invoke_pre_check_delay
+            )
+            sleep(invoke_pre_check_delay)
+        if block:
+            total_wait = 0
+
+            while self.is_queued():
+                log.info(
+                    "Waited %is for %s to begin...", total_wait, self.name)
+                sleep(invoke_block_delay)
+                total_wait += invoke_block_delay
+            if self.is_running():
+                print 'READY BUILD RUNNING'
+                running_build = self.get_build(build_id)
+                running_build.block_until_complete(delay=invoke_pre_check_delay)
+        print 'READY BUILD DONE'
+        return running_build
+
     def _buildid_for_type(self, buildtype):
         """Gets a buildid for a given type of build"""
         self.poll()
