@@ -239,7 +239,7 @@ class Job(JenkinsBase, MutableJenkinsThing):
         assert isinstance(invoke_block_delay, (int, float))
         assert isinstance(block, bool)
         assert isinstance(skip_if_running, bool)
-        running_build = None
+        build = None
 
         # Either copy the params dict or make a new one.
         build_params = build_params and dict(
@@ -294,9 +294,9 @@ class Job(JenkinsBase, MutableJenkinsThing):
                 sleep(invoke_block_delay)
                 total_wait += invoke_block_delay
             if self.is_running():
-                running_build = self.get_build(build_id)
-                running_build.block_until_complete(delay=invoke_pre_check_delay)
-        return running_build
+                build = self.get_build(build_id)
+                build.block_until_complete(delay=invoke_pre_check_delay)
+        return build
 
     def _buildid_for_type(self, buildtype):
         """Gets a buildid for a given type of build"""
