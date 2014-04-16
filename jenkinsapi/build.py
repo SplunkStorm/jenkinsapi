@@ -142,7 +142,7 @@ class Build(JenkinsBase):
         upstream_build = None
         causes = None
         upstream = None
-        causes = actions = self.get_actions()['causes']
+        causes = self.get_actions()['causes']
         for cause in causes:
             if 'upstreamBuild' in cause:
                 upstream_build = cause['upstreamBuild']
@@ -159,6 +159,12 @@ class Build(JenkinsBase):
                         return upstream_build   
         return upstream_build  """
 
+    def get_parameters_values(self):
+        """
+        @KOKO: extending to get the build parameters values
+        """
+        params = self.get_actions()['parameters']
+        return dict([(x['name'], x['value']) for x in params])
 
     """ KOKO CHANGES
     def get_upstream_build_number(self):
