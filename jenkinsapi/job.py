@@ -220,14 +220,13 @@ class Job(JenkinsBase, MutableJenkinsThing):
 
 
     def trigger_build(self,
-               block=False,
-               skip_if_running=False,
+               block=True,
                invoke_pre_check_delay=3,
                invoke_block_delay=3,
                build_params=None,
     ):
         """
-        SEC-1545: this is a new implementation for triggering a job. The
+        This is a new implementation for triggering a job. The
         'invoke' method returns the wrong build number in scenarios where
         multiple builds of the same job are triggered at the same time. The new
         implementation parses the response html sent by the request.
@@ -238,50 +237,29 @@ class Job(JenkinsBase, MutableJenkinsThing):
         assert isinstance(invoke_pre_check_delay, (int, float))
         assert isinstance(invoke_block_delay, (int, float))
         assert isinstance(block, bool)
-        assert isinstance(skip_if_running, bool)
-        build = None
-
-        # Either copy the params dict or make a new one.
-        #build_params = build_params and dict(
-        #    build_params.items()) or {}  # Via POSTed JSON
-        #params = {}  # Via Get string
-
-        build = self._build(build_params)
-        if build is None:
-            raise NotInQueue("Job could not be scheduled on Jenkins.")
-
-        if invoke_pre_check_delay > 0:
-            log.info(
-                "Waiting for %is to allow Jenkins to catch up",
-                invoke_pre_check_delay
-            )
-            sleep(invoke_pre_check_delay)
-        if block:
-            build.block_until_complete(delay=invoke_pre_check_delay)
-        return build
-
-    def _build(self, build_parameters):
-        """
-        Jenkins does not return a clean build number when you trigger a build.
-        The build id you get back may or may not be the actual one. This mehtod
-        attempts to remedy this issue by verify that the build that is returned
-        is the correct one. It uses stackid as source of truth, based on the
-        fact that only one pipeline of a particular stackid can be running at
-        any one time.
-        """
-        build = None
-        build_params = build_parameters and dict(
-            build_parameters.items()) or {}  # Via POSTed JSON
-        params = {}  # Via Get string
-
-        if len(self.get_params_list()) == 0:
+        assert isinstance(build_params, dict)
+        if len(build_params.keys()) == 0:
             log.error("Parameters list was 0")
             raise WillNotBuild('Parameters list cannot be 0')
 
-        log.info("Attempting to start %s on %s", self.name, repr(
-            self.get_jenkins_obj()))
-        #Get existing builds
+        build = self._trigger(build_params)
+        if build is None:
+            raise NotInQueue("Job could not be scheduled on Jenkins.")
+
+        if block:
+            print 'Waiting for pipeline to complete'
+            build.block_until_complete(delay=invoke_pre_check_delay)
+        return build
+
+    def _trigger(self, build_parameters):
+        #Get existing builds for initial job
         self.initial_builds = set(self.get_latest_build_numbers())
+        build_params = build_parameters
+        params = {}  # Via Get string
+
+        if len(build_parameters.keys()) == 0:
+            log.error("Parameters list was 0")
+            raise WillNotBuild('Parameters list cannot be 0')
 
         url = self.get_build_triggerurl()
         data = build_params
@@ -293,10 +271,10 @@ class Job(JenkinsBase, MutableJenkinsThing):
             valid=[200, 201],
             headers=headers
         )
-
         json_response = response.text
         json_data = json.loads(json_response)
         build_id = json_data['nextBuildNumber']
+        print 'Pipeline id: ' + str(build_id)
         check_delay=3
         log.info(
                 "Waiting for %is to allow Jenkins to catch up",
@@ -310,20 +288,23 @@ class Job(JenkinsBase, MutableJenkinsThing):
             sleep(check_delay)
             total_wait += check_delay
 
-        build = self.get_build(build_id)
+        #Validate build id
+        if not self._is_valid_build_id(build_id, build_parameters):
+            log.error("invalid build id sent by Jenkins")
+            build = self._search_for_right_build(build_parameters)
+        else:
+            build = self.get_build(build_id)
+
+        return build
+
+    def _is_valid_build_id(self, id, parameters):
+        build = self.get_build(id)
         actual_params = build.get_parameters_values()
-        if actual_params:
-            if cmp(actual_params, params) == 0:
-                log.info("Correct build id was returned by Jenkins.")
-                return build
+        return cmp(actual_params, parameters) == 0
 
-        # If we get here, we need to find the correct build other ways
-        log.info("Build id does not match build parameters")
-        # 1- Look in Jenkins in recent builds
-        return self._find_in_recent_builds(actual_params)
-
-    def _find_in_recent_builds(self, parameters):
+    def _search_for_right_build(self, expected_parameters):
         build = None
+        print ("action:Searching for right build")
 
         # Filter out old builds and find one with matching parameters
         old_builds = self.initial_builds
@@ -336,8 +317,10 @@ class Job(JenkinsBase, MutableJenkinsThing):
 
         for build_id in recent_builds:
             temp_build = self.get_build(build_id)
-            if cmp(temp_build.get_parameters_values(), parameters) == 0:
-                return temp_build
+            tem_params = temp_build.get_parameters_values()
+            if cmp(tem_params, expected_parameters) == 0:
+                build = temp_build
+                break
 
         return build
 

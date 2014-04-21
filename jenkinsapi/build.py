@@ -163,8 +163,9 @@ class Build(JenkinsBase):
         """
         @KOKO: extending to get the build parameters values
         """
+
         params = self.get_actions()['parameters']
-        return dict([(x['name'], x['value']) for x in params])
+        return dict([(x.get('name'), x.get('value')) for x in params])
 
     """ KOKO CHANGES
     def get_upstream_build_number(self):
