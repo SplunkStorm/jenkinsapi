@@ -167,18 +167,6 @@ class Build(JenkinsBase):
         params = self.get_actions()['parameters']
         return dict([(x.get('name'), x.get('value')) for x in params])
 
-    """ KOKO CHANGES
-    def get_upstream_build_number(self):
-        
-        Get the upstream build number if it exist, None otherwise
-        :return: int or None
-        
-        try:
-            return int(self.get_actions()['causes'][0]['upstreamBuild'])
-        except KeyError:
-            return None
-    """
-
     def get_upstream_build(self):
         """
         Get the upstream build if it exist, None otherwise
@@ -340,6 +328,13 @@ class Build(JenkinsBase):
         If the build is still running, return False.
         """
         return (not self.is_running()) and self._data["result"] == STATUS_SUCCESS
+
+    def get_result(self):
+        """
+        Return one of the Jenkins status Constants
+        """
+        return self._data["result"]
+
 
     def block_until_complete(self, delay=15):
         assert isinstance(delay, int)
