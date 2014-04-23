@@ -257,10 +257,6 @@ class Job(JenkinsBase, MutableJenkinsThing):
         build_params = build_parameters
         params = {}  # Via Get string
 
-        if len(build_parameters.keys()) == 0:
-            log.error("Parameters list was 0")
-            raise WillNotBuild('Parameters list cannot be 0')
-
         url = self.get_build_triggerurl()
         data = build_params
         headers = {'Accept': 'application/json'}  #Ask for json response
