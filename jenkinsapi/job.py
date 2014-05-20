@@ -247,7 +247,6 @@ class Job(JenkinsBase, MutableJenkinsThing):
             raise NotInQueue("Job could not be scheduled on Jenkins.")
 
         if block:
-            print 'Waiting for pipeline to complete'
             build.block_until_complete(delay=invoke_pre_check_delay)
         return build
 
@@ -259,7 +258,7 @@ class Job(JenkinsBase, MutableJenkinsThing):
 
         url = self.get_build_triggerurl()
         data = build_params
-        headers = {'Accept': 'application/json'}  #Ask for json response
+        headers = {'Accept': 'application/json'}  # Ask for json response
         response = self.jenkins.requester.post_and_confirm_status(
             url,
             data=data,
@@ -270,7 +269,6 @@ class Job(JenkinsBase, MutableJenkinsThing):
         json_response = response.text
         json_data = json.loads(json_response)
         build_id = json_data['nextBuildNumber']
-        print 'Pipeline id: ' + str(build_id)
         check_delay=3
         log.info(
                 "Waiting for %is to allow Jenkins to catch up",
@@ -285,7 +283,7 @@ class Job(JenkinsBase, MutableJenkinsThing):
             total_wait += check_delay
 
         #Validate build id
-        if not self._is_valid_build_id(build_id, build_parameters):
+        if not self._is_correct_build_id(build_id, build_parameters):
             log.error("invalid build id sent by Jenkins")
             build = self._search_for_right_build(build_parameters)
         else:
@@ -293,16 +291,15 @@ class Job(JenkinsBase, MutableJenkinsThing):
 
         return build
 
-    def _is_valid_build_id(self, id, parameters):
+    def _is_correct_build_id(self, id, parameters):
         build = self.get_build(id)
         actual_params = build.get_parameters_values()
         return cmp(actual_params, parameters) == 0
 
     def _search_for_right_build(self, expected_parameters):
         build = None
-        print ("action:Searching for right build")
 
-        # Filter out old builds and find one with matching parameters
+        # Filter out old builds and look for one with matching parameters
         old_builds = self.initial_builds
         self.poll()
         updated_builds = set(self.get_latest_build_numbers())
@@ -314,7 +311,7 @@ class Job(JenkinsBase, MutableJenkinsThing):
         for build_id in recent_builds:
             temp_build = self.get_build(build_id)
             tem_params = temp_build.get_parameters_values()
-            if cmp(tem_params, expected_parameters) == 0:
+            if cmp(tem_params, expected_parameters) == 0: # Found right build
                 build = temp_build
                 break
 
