@@ -284,7 +284,7 @@ class Job(JenkinsBase, MutableJenkinsThing):
 
         #Validate build id
         if not self._is_correct_build_id(build_id, build_parameters):
-            log.error("invalid build id sent by Jenkins")
+            log.error("Invalid build ID sent by Jenkins: %s", build_id)
             build = self._search_for_right_build(build_parameters)
         else:
             build = self.get_build(build_id)
@@ -294,7 +294,13 @@ class Job(JenkinsBase, MutableJenkinsThing):
     def _is_correct_build_id(self, id, parameters):
         build = self.get_build(id)
         actual_params = build.get_parameters_values()
+        log.info("input_params:")
+        log.info(parameters)
+        log.info("build_params:")
+        log.info(actual_params)
+
         return cmp(actual_params, parameters) == 0
+
 
     def _search_for_right_build(self, expected_parameters):
         build = None
@@ -310,10 +316,11 @@ class Job(JenkinsBase, MutableJenkinsThing):
 
         for build_id in recent_builds:
             temp_build = self.get_build(build_id)
-            tem_params = temp_build.get_parameters_values()
-            if cmp(tem_params, expected_parameters) == 0: # Found right build
-                build = temp_build
-                break
+            if temp_build.is_running():
+                tem_params = temp_build.get_parameters_values()
+                if cmp(tem_params, expected_parameters) == 0: # Found right build
+                    build = temp_build
+                    break
 
         return build
 
