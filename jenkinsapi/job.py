@@ -292,6 +292,7 @@ class Job(JenkinsBase, MutableJenkinsThing):
         return build
 
     def _is_correct_build_id(self, id, parameters):
+        correct_build = True
         build = self.get_build(id)
         actual_params = build.get_parameters_values()
         log.info("input_params:")
@@ -299,7 +300,13 @@ class Job(JenkinsBase, MutableJenkinsThing):
         log.info("build_params:")
         log.info(actual_params)
 
-        return cmp(actual_params, parameters) == 0
+        for key, value in parameters.iteritems():
+            if actual_params[key] != value:
+                correct_build = False
+                break
+        return correct_build
+
+        #return cmp(actual_params, parameters) == 0
 
 
     def _search_for_right_build(self, expected_parameters):
